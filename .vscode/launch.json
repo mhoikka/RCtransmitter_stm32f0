@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        
+        {
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceRoot}/main.elf",
+            "name": "Debug with ST-Util",
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none",
+            "servertype": "stutil",
+            "gdbPath": "gdb-multiarch"
+        },
+
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/main.elf",
+            "miDebuggerServerAddress": "localhost:4242",
+            "cwd" : ".",
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "stopAtEntry": true
+        }
+    ]
+}

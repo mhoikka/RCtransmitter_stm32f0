@@ -7,6 +7,7 @@
 #include "bme280_defs.h"
 #include "stm32f0xx_spi.h"
 
+const uint8_t DEGREE_45 = 1;
 
 /* Exported functions ------------------------------------------------------- */
 void TimingDelay_Decrement(void);
@@ -44,40 +45,40 @@ int main(void)
        system_stm32f0xx.c file
      */ 
   /* SysTick end of count event each 1ms */
-  /*
-  for(int i = 0; i < sizeof(num_buf)/sizeof(num_buf[0]); i++)
-  {
-      num_buf[i] = 0;
-  }*/
-  /*unsigned char data[33] = {0x04, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      
-                            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                            0xFF, 0xFF, 0x04};  */
-  unsigned char data[33] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+
+  unsigned char data[32] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                            0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+                            0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05};
 
   int readings_arr[3];
-  //unsigned char data[4] = {0x04, 0xFF, 0xFF, 0x04};  
 
   System_Clock_Init();
-  I2C_Settings_Init();
-  UART_Settings_Init();
 
-  send_stringln("Start");
+  // Servo_Peripherals_Init();
+  // DriveServoControl(DEGREE_45);
 
-  BME_Init(); //Not enough current to run both NRF and BME at the same time
 
-  NRF24L01p_Init();
+  // HBridge_Peripherals_Init();
+  // DriveACMotorVoltageController(4500); 
+
+  // ADCPeripherals_Init();
+  // uint16_t * adc_values = ADC_take_Readings();
+
+  //I2C_Settings_Init();
+  //UART_Settings_Init();
+
+  //send_stringln("Start");
+
+  //BME_Init(); 
+
+  NRF24L01p_Init(); // TEST
 
   Delay(1);
-  test_nrf24_connection();
-  bme280_delay_microseconds(100*1000, NULL);  //wait for NRF24L01+ to power on
+  test_nrf24_connection(); // TEST
+  delay_microseconds(100*1000, NULL);  //wait for NRF24L01+ to power on TEST
 
-  transmit(data, sizeof(data)/sizeof(unsigned char));
+  transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
 
   //STM_EVAL_LEDInit(LED2);
   //STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_EXTI);  
@@ -91,16 +92,14 @@ int main(void)
     STM_EVAL_LEDToggle(LED2);
 
     
-    display_sensor_reading();
-    struct ambient_reading curr_read = return_sensor_reading();
-    readings_arr[0] = (int)curr_read.temperature;
-    readings_arr[1] = (int)curr_read.pressure; // value is unsigned int
-    readings_arr[2] = (int)curr_read.humidity; // value is unsigned int
+    //display_sensor_reading();
+    //struct ambient_reading curr_read = return_sensor_reading();
+    //readings_arr[0] = (int)curr_read.temperature;
+    //eadings_arr[1] = (int)curr_read.pressure; // value is unsigned int
+    //readings_arr[2] = (int)curr_read.humidity; // value is unsigned int
     
-    transmit(readings_arr, sizeof(readings_arr)/(sizeof(unsigned char)), 1); 
-    //transmit(data, sizeof(data)/sizeof(unsigned char));
+    //transmit(readings_arr, sizeof(readings_arr)/(sizeof(unsigned char)), 1); 
 
-    //send_stringln("Test 3");
     Delay(1000);
   }
 }

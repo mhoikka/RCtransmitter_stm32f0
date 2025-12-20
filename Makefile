@@ -66,7 +66,7 @@ $(PROJ_NAME).elf: $(SRCS)
 	$(OBJCOPY) -O ihex $(PROJ_NAME).elf $(PROJ_NAME).hex
 	$(OBJCOPY) -O binary $(PROJ_NAME).elf $(PROJ_NAME).bin
 	$(OBJDUMP) -St $(PROJ_NAME).elf >$(PROJ_NAME).lst
-        $(OBJDUMP) -t $(PROJ_NAME).elf 
+	$(OBJDUMP) -t $(PROJ_NAME).elf 
 	$(SIZE) $(PROJ_NAME).elf
 	
 program: $(PROJ_NAME).bin
