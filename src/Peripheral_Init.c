@@ -483,17 +483,17 @@ void I2C_Settings_Init(){
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
   //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);//
   RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
-  
-  // Use pins PF0 and PF1 for I2C (STM32F030R8T6)
+
+  // Use pins PB8 and PB9 for I2C (STM32F030R8T6)
   GPIO_InitTypeDef GPIO_InitStruct;
-  GPIO_PinAFConfig(GPIOF, GPIO_PinSource0, GPIO_AF_1);
-  GPIO_PinAFConfig(GPIOF, GPIO_PinSource1, GPIO_AF_1);
-  GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_1);
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource9, GPIO_AF_1);
+  GPIO_InitStruct.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
   GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
   GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz; 
   GPIO_InitStruct.GPIO_OType = GPIO_OType_OD;
   GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_Init(GPIOF, &GPIO_InitStruct);
+  GPIO_Init(GPIOB, &GPIO_InitStruct);
 	
   // I2C configuration
   I2C_InitTypeDef I2C_InitStruct;
@@ -505,7 +505,7 @@ void I2C_Settings_Init(){
   I2C_Cmd(I2C1, ENABLE);
 
   ctx.I2C_InitStruct = &I2C_InitStruct;
-  ctx.i2c_address = 0x68; // Set the I2C address for gyroscope with grounded AD0 pin
+  ctx.i2c_address = 0x68; // TODO replace this address with the bme280 address or remove if unnecessary
 }
 
 void nrf24_write_register(uint8_t reg, uint8_t value) {
