@@ -67,42 +67,9 @@ int main(void)
 
   I2C_Settings_Init();
 
-  // Wait until bus is idle
-  while (I2C1->ISR & I2C_ISR_BUSY);
-
-  // Clear STOP flag from previous transfer
-  I2C1->ICR = I2C_ICR_STOPCF;
-
-  // Configure transfer (WRITE, 1 byte)
-  I2C1->CR2 =
-      (0x69 << 1) |                  // Slave address
-      (1 << 16)| 
-      I2C_CR2_START;                 // Generate START
-
-
-  // Wait for TXIS or NACK
-  while (!(I2C1->ISR & (I2C_ISR_TXIS | I2C_ISR_NACKF)));
-
-  if (I2C1->ISR & I2C_ISR_NACKF) {
-      I2C1->ICR = I2C_ICR_NACKCF;
-      return;
-  }
-
-  // Send data
-  I2C1->TXDR = 0x01;
-
-  // Wait for transfer complete
-  while (!(I2C1->ISR & I2C_ISR_TC));
-
-  // Generate STOP
-  I2C1->CR2 |= I2C_CR2_STOP;
-
-  // Wait for STOP to finish
-  while (!(I2C1->ISR & I2C_ISR_STOPF));
-  I2C1->ICR = I2C_ICR_STOPCF;
-
-
-
+  float ambient_data[10];
+  getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
+  getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
   //UART_Settings_Init();
 
   //send_stringln("Start");

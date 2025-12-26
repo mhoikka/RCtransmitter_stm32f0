@@ -508,6 +508,133 @@ void I2C_Settings_Init(){
   ctx.i2c_address = 0x68; // TODO replace this address with the bme280 address or remove if unnecessary
 }
 
+/**
+ * @brief Transmits a single byte over I2C
+ * @param i2c_address 7 bit I2C address of the slave device
+ * @param i2c_data byte of data to be transmitted
+ * @retval None
+ */
+void I2C_transmit(uint8_t i2c_address, uint8_t reg_address, uint8_t i2c_data){
+  // Wait until bus is idle
+  while (I2C1->ISR & I2C_ISR_BUSY);
+
+  // Clear STOP flag from previous transfer
+  I2C1->ICR = I2C_ICR_STOPCF;
+
+  // Configure transfer (WRITE, 1 byte)
+  I2C1->CR2 =
+      (i2c_address << 1) |           // Slave address
+      (2 << 16)|
+      I2C_CR2_START;                 // Generate START
+
+
+  // Wait for TXIS or NACK
+  while (!(I2C1->ISR & (I2C_ISR_TXIS | I2C_ISR_NACKF)));
+
+  if (I2C1->ISR & I2C_ISR_NACKF) {
+      I2C1->ICR = I2C_ICR_NACKCF;
+      return;
+  }
+
+  // Send data
+  I2C1->TXDR = reg_address;
+  // Send data byte
+  while(!(I2C1->ISR & I2C_ISR_TXIS)); // Wait again
+  I2C1->TXDR = i2c_data;
+
+  // Wait for transfer complete
+  while (!(I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF))); // TODO Should check for NACK here too? Not sure.
+
+  if (I2C1->ISR & I2C_ISR_NACKF) {
+      I2C1->ICR = I2C_ICR_NACKCF;
+      return;
+  }
+  
+  // Generate STOP
+  I2C1->CR2 |= I2C_CR2_STOP;
+
+  // Wait for STOP to finish
+  while (!(I2C1->ISR & I2C_ISR_STOPF));
+  I2C1->ICR = I2C_ICR_STOPCF;
+}
+
+/**
+ * @brief Receives a single byte over I2C
+ * @param uint8_t  i2c_address 7 bit I2C address of the slave device
+ * @param uint8_t  reg_address register address to read from
+ * @param uint8_t* i2c_data pointer to array to store received data
+ * @param uint8_t  numbytes number of bytes to read
+ * @retval Received byte of data
+ */
+uint8_t * I2C_receive(uint8_t i2c_address, uint8_t reg_address, uint8_t * i2c_data, uint8_t numbytes){
+
+  // Populate array with error data
+  for(int i = 0; i < numbytes; i++){
+    i2c_data[i] = 0xFF;
+  }
+
+  // Wait until bus is idle
+  while (I2C1->ISR & I2C_ISR_BUSY);
+
+  // Clear STOP flag from previous transfer
+  I2C1->ICR = I2C_ICR_STOPCF;
+
+  // Configure transfer (WRITE, 1 byte)
+  I2C1->CR2 =
+      (i2c_address << 1) |           // Slave address
+      (1 << 16)| 
+      I2C_CR2_START;                 // Generate START
+
+
+  // Wait for TXIS or NACK
+  while (!(I2C1->ISR & (I2C_ISR_TXIS | I2C_ISR_NACKF)));
+
+  if (I2C1->ISR & I2C_ISR_NACKF) {
+      I2C1->ICR = I2C_ICR_NACKCF;
+      return i2c_data;
+  }
+
+  // Send data
+  I2C1->TXDR = reg_address;
+
+  // Wait for transfer complete
+  while (!(I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF))); // TODO Should check for NACK here too? Not sure. Do I need to check for TC when reading right afterwards?
+
+  if (I2C1->ISR & I2C_ISR_NACKF) {
+      I2C1->ICR = I2C_ICR_NACKCF;
+      return i2c_data;
+  }
+  
+  // Configure transfer for reading
+  I2C1->CR2 =
+      (i2c_address << 1) |           // Slave address
+      (numbytes << 16)|
+      I2C_CR2_RD_WRN |              // Read mode
+      I2C_CR2_START  |              // Generate START
+	    I2C_CR2_AUTOEND;
+  
+  // Wait for RXNE or NACK 'numbytes' times and fill the data array, returning early if NACK received
+  for(int i = 0; i < numbytes; i++){
+    while (!(I2C1->ISR & (I2C_ISR_RXNE | I2C_ISR_NACKF)));
+    if (I2C1->ISR & I2C_ISR_NACKF) {
+      I2C1->ICR = I2C_ICR_NACKCF;
+      // Repopulate array with error data
+      for(int i = 0; i < numbytes; i++){
+        i2c_data[i] = 0xFF;
+      }
+      return i2c_data; 
+    }
+    // Read data received
+    i2c_data[i] = I2C1 -> RXDR;
+  }
+  
+  // Wait for STOP to finish
+  while (!(I2C1->ISR & I2C_ISR_STOPF));
+  I2C1->ICR = I2C_ICR_STOPCF;
+  
+  return i2c_data;
+}
+
 void nrf24_write_register(uint8_t reg, uint8_t value) {
     uint8_t txData[2]; // Transmit data buffer
 
@@ -927,3 +1054,139 @@ void UART_Settings_Init(){
   //No synchronous mode yet
   USART_Cmd(USART2, ENABLE);
 }
+
+/**
+ * @brief Collects ambient data from ICM20948 and returns it while setting the ICM to continuous mode 4
+ * @param None
+ * @retval float * ICM_data: Pointer to an array of 10 floats that store the acceleration (X, Y, Z), gyroscope (X, Y, Z) data, temperature, and magnetometer (X, Y, Z) data in units of m/s^2, degrees per second, Celcius, and uT respectively
+ */
+  void getICM20948_ACCEL_GYRO_TEMPdata(float * ICM_data){
+    static uint8_t ICM_20948_I2C_ADDRESS = 0x69;
+    static uint8_t REG_BANK_SEL = 0x7F;
+    static uint8_t USER_BANK_0 = (0 << 4);
+    static uint8_t USER_BANK_1 = (1 << 4);
+    static uint8_t USER_BANK_2 = (2 << 4);
+    static uint8_t USER_BANK_3 = (3 << 4);
+
+    // REGISTER BANK 2
+    static uint8_t LP_CONFIG = 0x05;
+    static uint8_t PWR_MGMT_1 = 0x06;
+    static uint8_t PWR_MGMT_2 = 0x07;
+    // REGISTER BANK 2
+    static uint8_t TEMP_CONFIG = 0x53; 
+    static uint8_t GYRO_SMPLRT_DIV = 0x00;
+    static uint8_t GYRO_CONFIG_1 = 0x01;
+    static uint8_t GYRO_CONFIG_2 = 0x02;
+    static uint8_t ACCEL_SMPLRT_DIV = 0x10;
+    static uint8_t ACCEL_CONFIG = 0x14;
+    static uint8_t ACCEL_CONFIG_2 = 0x15;
+    static uint8_t GYRO_ACCEL_START_REG = 0x2D; // ACCEL_XOUT_H register
+
+    static uint8_t MAG_START_REG = 0x11;
+
+    float ACCEL_SENSITIVITY = 2048;
+    float GYRO_SENSITIVITY = 16.4; 
+    float MAG_SENSITIVITY = 0.15;
+    float TEMP_SENSITIVITY = 337.87; 
+
+    // Accelerometer and Gyroscope variables
+    uint8_t accel_gyro_data[14];
+    float accel_out[3]; //{X,Y,Z}
+    float gyro_out[3]; //{X,Y,Z}
+
+    // Thermometer variables
+    float temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
+
+    // Magnetometer variables
+    int16_t mag_raw[3];
+    float mag_out[3];
+    uint8_t buf[6];
+    uint8_t new_magdata = 0;
+    uint8_t mag_overf = 0;
+    uint8_t st1 = 0;
+    uint8_t st2 = 0;
+    
+    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
+
+    I2C_transmit(0x69, LP_CONFIG, 0x30); // set low power mode for ICM20948 (ACCEL/ GYRO in duty cycle mode)
+
+    I2C_transmit(0x69, PWR_MGMT_1, 0x11); // set low power enable for digital circuitry (does not turn on LP mode, use LP_CONFIG) and auto clock select for ICM20948
+    I2C_transmit(0x69, PWR_MGMT_2, 0x00); // enable accelerometer and gyroscope for ICM20948
+
+    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_2); // switch to USER BANK 2
+  
+    I2C_transmit(0x69, TEMP_CONFIG, 0x01); // set TEMP_DLPCFG for temperature sensor to 1
+
+    I2C_transmit(0x69, GYRO_SMPLRT_DIV, 0x07); // set gyro sample rate divider to 7 for ICM20948
+    I2C_transmit(0x69, GYRO_CONFIG_1, 0x3F); // Set gyro +- range to 2000dps and DLPF 3dB point to 361 Hz, and enable LPF for ICM20948
+    I2C_transmit(0x69, GYRO_CONFIG_2, 0x02); // Enable 4x averaging for gyro data for ICM20948
+
+    I2C_transmit(0x69, ACCEL_SMPLRT_DIV, 0x0A); // set accel sample rate divider to 10 for ICM20948
+    I2C_transmit(0x69, ACCEL_CONFIG, 0x3F); // Set accel +- range to 16g and DLPF 3dB point to 473 Hz, and enable LPF for ICM20948
+    I2C_transmit(0x69, ACCEL_CONFIG_2, 0x00); // Enable 4x averaging for accel data for ICM20948
+
+    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
+
+    // Read accelerometer and gyroscope data test
+    I2C_receive(0x69, GYRO_ACCEL_START_REG, accel_gyro_data, 14); // read ACCEL_XOUT_H register and the following 11 registers for accel and gyro data
+
+    accel_out[0] = ((accel_gyro_data[0] << 8) + accel_gyro_data[1]) / ACCEL_SENSITIVITY * 9.81; // TODO adjust gyro and accelerometer data for temperature drift values
+    accel_out[1] = ((accel_gyro_data[2] << 8) + accel_gyro_data[3]) / ACCEL_SENSITIVITY * 9.81; // m/s^2 // TODO reading very high m(309.6 m/s^2), bug?
+    accel_out[2] = ((accel_gyro_data[4] << 8) + accel_gyro_data[5]) / ACCEL_SENSITIVITY * 9.81; // m/s^2
+
+    gyro_out[0] = (accel_gyro_data[6] * UINT8_MAX + accel_gyro_data[7]) / GYRO_SENSITIVITY; // Degrees per second
+    gyro_out[1] = (accel_gyro_data[8] * UINT8_MAX + accel_gyro_data[9]) / GYRO_SENSITIVITY; // Degrees per second
+    gyro_out[2] = (accel_gyro_data[10] * UINT8_MAX + accel_gyro_data[11]) / GYRO_SENSITIVITY; // Degrees per second
+
+    temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
+
+    // BANK 0: Enable I2C master
+    // Select BANK0
+    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0);
+
+    // Enable bypass mode
+    I2C_transmit(0x69, 0x0F, 0x02);  // INT_PIN_CFG: BYPASS_EN = 1
+
+    I2C_transmit(0x0C, 0x31, 0x08);  // CNTL2 register = 0x16 (continuous 100 Hz)
+    Delay(10); // TODO find out how long the magnetometer needs to start up
+    
+    do {
+      I2C_receive(0x0C, 0x10, &st1, 1);  // read ST1
+    } while (!(st1 & 0x01)); // Wait for DRDY flag
+    I2C_receive(0x0C, MAG_START_REG, buf, 6); // 0x0C is for the internal magnetometer
+    I2C_receive(0x0C, 0x18, &st2, 1);  // read ST2 // TODO handle overflow flags here 
+
+    // Now interpret:
+    mag_raw[0] = (int16_t)((buf[1] << 8) | buf[0]); // X
+    mag_raw[1] = (int16_t)((buf[3] << 8) | buf[2]); // Y
+    mag_raw[2] = (int16_t)((buf[5] << 8) | buf[4]); // Z
+
+    // ST1 check (data ready)
+    if(!(st1 & 0x01)) {
+        // TOD0 No new data; skip using this sample
+        new_magdata = 0;
+        //return;  
+    }
+
+    // ST2 check (overflow)
+    if(st2 & 0x08) {
+        // TODO Magnetic overflow — discard values
+        mag_overf = 1;
+        //return;
+    }
+
+    mag_out[0] = mag_raw[0] * 0.15f; // uT
+    mag_out[1] = mag_raw[1] * 0.15f; // uT
+    mag_out[2] = mag_raw[2] * 0.15f; // uT
+    
+    ICM_data[0] = accel_out[0];
+    ICM_data[1] = accel_out[1];
+    ICM_data[2] = accel_out[2];
+    ICM_data[3] = gyro_out[0];
+    ICM_data[4] = gyro_out[1];
+    ICM_data[5] = gyro_out[2];
+    ICM_data[6] = temp_out;
+    ICM_data[7] = mag_out[0];
+    ICM_data[8] = mag_out[1];
+    ICM_data[9] = mag_out[2];
+  }
