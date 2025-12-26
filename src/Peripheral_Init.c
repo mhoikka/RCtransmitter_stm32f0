@@ -1055,56 +1055,36 @@ void UART_Settings_Init(){
   USART_Cmd(USART2, ENABLE);
 }
 
-/**
- * @brief Collects ambient data from ICM20948 and returns it while setting the ICM to continuous mode 4
- * @param None
- * @retval float * ICM_data: Pointer to an array of 10 floats that store the acceleration (X, Y, Z), gyroscope (X, Y, Z) data, temperature, and magnetometer (X, Y, Z) data in units of m/s^2, degrees per second, Celcius, and uT respectively
- */
-  void getICM20948_ACCEL_GYRO_TEMPdata(float * ICM_data){
-    static uint8_t ICM_20948_I2C_ADDRESS = 0x69;
-    static uint8_t REG_BANK_SEL = 0x7F;
-    static uint8_t USER_BANK_0 = (0 << 4);
-    static uint8_t USER_BANK_1 = (1 << 4);
-    static uint8_t USER_BANK_2 = (2 << 4);
-    static uint8_t USER_BANK_3 = (3 << 4);
 
-    // REGISTER BANK 2
-    static uint8_t LP_CONFIG = 0x05;
-    static uint8_t PWR_MGMT_1 = 0x06;
-    static uint8_t PWR_MGMT_2 = 0x07;
-    // REGISTER BANK 2
-    static uint8_t TEMP_CONFIG = 0x53; 
-    static uint8_t GYRO_SMPLRT_DIV = 0x00;
-    static uint8_t GYRO_CONFIG_1 = 0x01;
-    static uint8_t GYRO_CONFIG_2 = 0x02;
-    static uint8_t ACCEL_SMPLRT_DIV = 0x10;
-    static uint8_t ACCEL_CONFIG = 0x14;
-    static uint8_t ACCEL_CONFIG_2 = 0x15;
-    static uint8_t GYRO_ACCEL_START_REG = 0x2D; // ACCEL_XOUT_H register
+static uint8_t ICM_20948_I2C_ADDRESS = 0x69;
+static uint8_t REG_BANK_SEL = 0x7F;
+static uint8_t USER_BANK_0 = (0 << 4);
+static uint8_t USER_BANK_1 = (1 << 4);
+static uint8_t USER_BANK_2 = (2 << 4);
+static uint8_t USER_BANK_3 = (3 << 4);
 
-    static uint8_t MAG_START_REG = 0x11;
+// REGISTER BANK 2
+static uint8_t LP_CONFIG = 0x05;
+static uint8_t PWR_MGMT_1 = 0x06;
+static uint8_t PWR_MGMT_2 = 0x07;
+// REGISTER BANK 2
+static uint8_t TEMP_CONFIG = 0x53; 
+static uint8_t GYRO_SMPLRT_DIV = 0x00;
+static uint8_t GYRO_CONFIG_1 = 0x01;
+static uint8_t GYRO_CONFIG_2 = 0x02;
+static uint8_t ACCEL_SMPLRT_DIV = 0x10;
+static uint8_t ACCEL_CONFIG = 0x14;
+static uint8_t ACCEL_CONFIG_2 = 0x15;
+static uint8_t GYRO_ACCEL_START_REG = 0x2D; // ACCEL_XOUT_H register
 
-    float ACCEL_SENSITIVITY = 2048;
-    float GYRO_SENSITIVITY = 16.4; 
-    float MAG_SENSITIVITY = 0.15;
-    float TEMP_SENSITIVITY = 337.87; 
+static uint8_t MAG_START_REG = 0x11;
 
-    // Accelerometer and Gyroscope variables
-    uint8_t accel_gyro_data[14];
-    float accel_out[3]; //{X,Y,Z}
-    float gyro_out[3]; //{X,Y,Z}
-
-    // Thermometer variables
-    float temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
-
-    // Magnetometer variables
-    int16_t mag_raw[3];
-    float mag_out[3];
-    uint8_t buf[6];
-    uint8_t new_magdata = 0;
-    uint8_t mag_overf = 0;
-    uint8_t st1 = 0;
-    uint8_t st2 = 0;
+  /**
+   * @brief Sets up ICM20948 for data collection and puts magnetometer(AK09916) into continuous mode 4 (100 Hz data rate)
+   * @param None
+   * @retval N0ne
+   */
+  void ICM20948_init(){
     
     I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
 
@@ -1127,7 +1107,42 @@ void UART_Settings_Init(){
 
     I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
 
-    // Read accelerometer and gyroscope data test
+    // Enable bypass mode for I2C access of internal magnetometer
+    I2C_transmit(0x69, 0x0F, 0x02);  // INT_PIN_CFG: BYPASS_EN = 1
+
+    I2C_transmit(0x0C, 0x31, 0x08);  // CNTL2 register = 0x16 (continuous 100 Hz updates to magnetometer data)
+    Delay(10); // TODO find out how long the magnetometer needs to start up
+  }
+
+  /**
+ * @brief Collects ambient data from ICM20948 and puts it into the provided array ICM_data
+ * @param None
+ * @retval None
+ */
+  void getICM20948_ACCEL_GYRO_TEMPdata(float * ICM_data){
+    static float ACCEL_SENSITIVITY = 2048;
+    static float GYRO_SENSITIVITY = 16.4; 
+    static float MAG_SENSITIVITY = 0.15;
+    static float TEMP_SENSITIVITY = 337.87; 
+
+    // Accelerometer and Gyroscope variables
+    uint8_t accel_gyro_data[14];
+    float accel_out[3]; //{X,Y,Z}
+    float gyro_out[3]; //{X,Y,Z}
+
+    // Thermometer variables
+    float temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
+
+    // Magnetometer variables
+    int16_t mag_raw[3];
+    float mag_out[3];
+    uint8_t buf[6];
+    uint8_t new_magdata = 0;
+    uint8_t mag_overf = 0;
+    uint8_t st1 = 0;
+    uint8_t st2 = 0;
+
+      // Read accelerometer and gyroscope data test
     I2C_receive(0x69, GYRO_ACCEL_START_REG, accel_gyro_data, 14); // read ACCEL_XOUT_H register and the following 11 registers for accel and gyro data
 
     accel_out[0] = ((accel_gyro_data[0] << 8) + accel_gyro_data[1]) / ACCEL_SENSITIVITY * 9.81; // TODO adjust gyro and accelerometer data for temperature drift values
@@ -1141,19 +1156,12 @@ void UART_Settings_Init(){
     temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
 
     // BANK 0: Enable I2C master
-    // Select BANK0
-    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0);
-
-    // Enable bypass mode
-    I2C_transmit(0x69, 0x0F, 0x02);  // INT_PIN_CFG: BYPASS_EN = 1
-
-    I2C_transmit(0x0C, 0x31, 0x08);  // CNTL2 register = 0x16 (continuous 100 Hz)
-    Delay(10); // TODO find out how long the magnetometer needs to start up
+    // Should still be in BANK 0
     
     do {
       I2C_receive(0x0C, 0x10, &st1, 1);  // read ST1
     } while (!(st1 & 0x01)); // Wait for DRDY flag
-    I2C_receive(0x0C, MAG_START_REG, buf, 6); // 0x0C is for the internal magnetometer
+    I2C_receive(0x0C, MAG_START_REG, buf, 6); // 0x0C I2C address is for the internal magnetometer
     I2C_receive(0x0C, 0x18, &st2, 1);  // read ST2 // TODO handle overflow flags here 
 
     // Now interpret:

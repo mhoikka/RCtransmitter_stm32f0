@@ -37,4 +37,5 @@ void DriveACMotorVoltageController(uint32_t Period);
 void NRF24L01p_Init();
 void I2C_Settings_Init();
 void UART_Settings_Init();
+void ICM20948_init();
 void getICM20948_ACCEL_GYRO_TEMPdata();

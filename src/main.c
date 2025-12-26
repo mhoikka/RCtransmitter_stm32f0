@@ -68,6 +68,8 @@ int main(void)
   I2C_Settings_Init();
 
   float ambient_data[10];
+  
+  ICM20948_init();
   getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
   getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
   //UART_Settings_Init();
