@@ -400,7 +400,7 @@ typedef struct bme280_data
 
     /*! Compensated humidity */
     double humidity;
-};
+ } bme280_data;
 #else
 typedef struct bme280_data
 {
@@ -412,7 +412,7 @@ typedef struct bme280_data
 
     /*! Compensated humidity */
     uint32_t humidity;
-};
+} bme280_data;
 #endif /*! BME280_USE_FLOATING_POINT */
 
 /*!

@@ -85,23 +85,16 @@ void __attribute__((optimize("O0"))) delay_microseconds(uint32_t usec, void *int
  * @retval 0 if successful, 1 if not
  */
 int8_t BME280_I2C_bus_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t cnt, void *intf_ptr){
- /*	\Brief: The function is used as I2C bus write
- *	\Return : Status of the I2C read
- *  \param *intf_ptr : Pointer to the interface pointer
- *	\param reg_addr : Address of the first register, will data is going to be written
- *	\param reg_data : Array for data to be read into from the sensor data register
- *	\param cnt : The # of bytes of data to be read
- **/
-
-	//send the register address to the sensor
-	//This is essentially a partial write operation
+	// Send the register address to the sensor
+	// This is essentially a partial write operation
   uint32_t dev_addr = BME280_I2C_ADDR_SEC;
 	I2C1->CR2 = (dev_addr << 1) | (I2C_CR2_START) | (1 << 16) | (I2C_CR2_AUTOEND);
-	I2C1->TXDR = reg_addr;
+	I2C1->TXDR = reg_addr; 
 
   // Wait for not busy
-  while (!(I2C1->ISR & I2C_ISR_BUSY));
-	while ((I2C1->ISR & I2C_ISR_BUSY));
+  while (!(I2C1->ISR & I2C_ISR_BUSY)){};
+
+	while ((I2C1->ISR & I2C_ISR_BUSY)){};
 
 	I2C1->CR2 = (dev_addr << 1) | (I2C_CR2_START) | (cnt << 16) | (I2C_CR2_RD_WRN) | (I2C_CR2_AUTOEND);
 
@@ -114,11 +107,11 @@ int8_t BME280_I2C_bus_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t cnt, vo
 
 
 	// Wait for not busy
-  while (!(I2C1->ISR & I2C_ISR_BUSY));
-	while ((I2C1->ISR & I2C_ISR_BUSY));
-	//return the status of the read operation
+  while (!(I2C1->ISR & I2C_ISR_BUSY)){};
+	while ((I2C1->ISR & I2C_ISR_BUSY)){};
+	// Return the status of the read operation
 
-	return 0; //BME OK
+	return 0; // BME OK
 }
 
 /**
@@ -130,13 +123,6 @@ int8_t BME280_I2C_bus_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t cnt, vo
  * @retval 0 if successful, 1 if not
  */
 int8_t BME280_I2C_bus_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t cnt, void *intf_ptr){
-/*	\Brief: The function is used as I2C bus write
- *	\Return : Status of the I2C write
- *  \param *intf_ptr : Pointer to the interface pointer
- *	\param reg_addr : Address of the first register, where data is going to be written
- *	\param reg_data : data to be written into the register
- *	\param cnt : The # of bytes of data to be written
- */
   uint32_t dev_addr = BME280_I2C_ADDR_SEC;
 	I2C1->CR2 = (dev_addr << 1) | (I2C_CR2_START) | (cnt*2 << 16) | (I2C_CR2_AUTOEND);
 	// transfer cnt bytes of data one register data byte and register address byte pair at a time
@@ -152,85 +138,14 @@ int8_t BME280_I2C_bus_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t 
 			while(!(I2C1->ISR & I2C_ISR_TXE));
 		}
 	// Wait for not busy
-  while (!(I2C1->ISR & I2C_ISR_BUSY));
-	while ((I2C1->ISR & I2C_ISR_BUSY));
+  while (!(I2C1->ISR & I2C_ISR_BUSY)){};
+	while ((I2C1->ISR & I2C_ISR_BUSY)){};
 	return 0;
 	}
 	else{
 		return 1;
 		//TODO Create an error function here? Maybe?
 	}
-}
-
-/**
- * @brief print the sensor reading
- * @retval None
- */
-void display_sensor_reading(){
-  char num_buf[65];
-  struct bme280_data bme280_datastruct = get_sensor_reading();
-  send_string(itoa((int)(bme280_datastruct.temperature), num_buf, 10));
-  send_stringln(" C");
-  send_string(itoa((int)(bme280_datastruct.pressure), num_buf, 10));
-  send_stringln(" Pa");
-  send_string(itoa((int)(bme280_datastruct.humidity), num_buf, 10));
-  send_stringln(" %");
-  send_stringln("");
-}
-
-struct ambient_reading{
-  uint32_t temperature;
-  uint32_t pressure;
-  uint32_t humidity;
-  uint8_t len;
-};
-/**
- * @brief return the sensor reading as an uint32_t array
- * @retval struct ambient_readings with data populated
- */
-struct ambient_reading return_sensor_reading(){
-  struct bme280_data bme280_datastruct = get_sensor_reading();
-  struct ambient_reading current_readings;
-  current_readings.temperature = (uint32_t)(bme280_datastruct.temperature);
-  current_readings.pressure = (uint32_t)(bme280_datastruct.pressure);
-  current_readings.humidity = (uint32_t)(bme280_datastruct.humidity);
-  current_readings.len = 3;
-  return current_readings;
-}
-
-/**
- * @brief Display formatted sensor reading from BME280
- * @param pointer to char buffer that stores the sensor readings while they are being written over UART
- * @retval None
- */
-struct bme280_data get_sensor_reading(){
-  bme280_get_sensor_data(BME280_ALL, &bme280_datastruct, &bme280_initparam);
-  return bme280_datastruct;
-}
-
-/**
- * @brief Initializes the BME 280 sensor
- * @retval None
- */
-void BME_Init(){
-  bme280_initparam.chip_id = BME280_CHIP_ID; 
-  bme280_initparam.intf = BME280_I2C_INTF; 
-  bme280_initparam.intf_ptr = (void *)&ctx; 
-  bme280_initparam.intf_rslt = BME280_INTF_RET_SUCCESS; 
-  bme280_initparam.read = BME280_I2C_bus_read;
-  bme280_initparam.write = BME280_I2C_bus_write;
-  bme280_initparam.delay_us = delay_microseconds;
-  bme280_init(&bme280_initparam);
-
-  struct bme280_settings bme_settings;
-  bme_settings.filter = BME280_FILTER_COEFF_16;             //  Adjust as needed
-  bme_settings.osr_h = BME280_OVERSAMPLING_16X ;            // Humidity oversampling
-  bme_settings.osr_p = BME280_OVERSAMPLING_16X ;            // Pressure oversampling
-  bme_settings.osr_t = BME280_OVERSAMPLING_16X ;            // Temperature oversampling
-  bme_settings.standby_time = BME280_STANDBY_TIME_62_5_MS;  // Standby time
-
-  bme280_set_sensor_settings(BME280_SEL_FILTER | BME280_SEL_OSR_HUM | BME280_SEL_OSR_PRESS | BME280_SEL_OSR_TEMP, &bme_settings, &bme280_initparam);
-  bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &bme280_initparam);  
 }
 
 /**
@@ -267,7 +182,7 @@ void HBridge_Peripherals_Init(){
 }
 
 /**
- * * @brief Initializes all of the peripherals necessary to control the servo motors using the STM32 chip
+ * @brief Initializes all of the peripherals necessary to control the servo motors using the STM32 chip
  * @retval None
  */
 void Servo_Peripherals_Init(){
@@ -381,9 +296,8 @@ void ADCPeripherals_Init(){
  * @brief Takes a single ADC reading from ADC10, ADC11, and ADC12
  * @retval 3 12 bit ADC reading in unsigned integer format, in a 16 bit integer package padded with 0s on the MSB side
  */
-uint16_t * ADC_take_Readings(){
-  // Take ADC readings from ADC10, ADC11, and ADC12
-  static uint16_t adc_readings[3];
+uint16_t * ADC_take_Readings(uint16_t * adc_readings){
+  // Take ADC readings from ADC10, ADC11, and ADC12 // TODO make it possible to select which ADC to read from
 
   // make sure ADC peripheral clock was enabled earlier:
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // safe to call if already enabled
@@ -442,7 +356,7 @@ uint16_t * ADC_take_Readings(){
   ADC_StartOfConversion(ADC1);
   while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
   adc_readings[2] = ADC_GetConversionValue(ADC1);
-  return &adc_readings;
+  return adc_readings;
 }
 
 /**
@@ -505,7 +419,6 @@ void I2C_Settings_Init(){
 
   // Enable peripheral clock
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
-  //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);//
   RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
 
   // Use pins PB8 and PB9 for I2C (STM32F030R8T6)
@@ -672,14 +585,14 @@ void nrf24_write_register(uint8_t reg, uint8_t value) {
     
     // Start SPI transmission
     for (int i = 0; i < 2; i++) {
-        // Transmit byte
-        *(__IO uint8_t*)(&SPI1->DR) = txData[i]; 
+      // Transmit byte
+      *(__IO uint8_t*)(&SPI1->DR) = txData[i]; 
 
-        // Wait until transmission is complete
-        while (!(SPI1->SR & SPI_SR_RXNE)); // Wait until receive buffer is not empty
+      // Wait until transmission is complete
+      while (!(SPI1->SR & SPI_SR_RXNE)); // Wait until receive buffer is not empty
 
-        // Read received byte (not used, but necessary to complete the transaction) 
-        (void)SPI1->DR; 
+      // Read received byte (not used, but necessary to complete the transaction) 
+      (void)SPI1->DR; 
     }
 
     // Set CSN high to end communication
@@ -704,14 +617,14 @@ void nrf24_multiwrite_register(uint8_t reg, uint8_t *values, uint8_t num_bytes) 
     
     // Start SPI transmission
     for (int i = 0; i < num_bytes+1; i++) {
-        // Transmit byte
-        *(__IO uint8_t*)(&SPI1->DR) = txData[i]; 
+      // Transmit byte
+      *(__IO uint8_t*)(&SPI1->DR) = txData[i]; 
 
-        // Wait until transmission is complete
-        while (!(SPI1->SR & SPI_SR_RXNE)); // Wait until receive buffer is not empty
+      // Wait until transmission is complete
+      while (!(SPI1->SR & SPI_SR_RXNE)); // Wait until receive buffer is not empty
 
-        // Read received byte (not used, but necessary to complete the transaction) 
-        (void)SPI1->DR; 
+      // Read received byte (not used, but necessary to complete the transaction) 
+      (void)SPI1->DR; 
     }
 
     // Set CSN high to end communication
@@ -719,8 +632,8 @@ void nrf24_multiwrite_register(uint8_t reg, uint8_t *values, uint8_t num_bytes) 
 }
 
 void nrf24_write_command(uint8_t COMMAND) {
-    // Set CSN low to start communication
-    set_nrf24_SPI_CSN(0);
+  // Set CSN low to start communication
+  set_nrf24_SPI_CSN(0);
     
     // Start SPI transmission
 	// Transmit byte
@@ -733,7 +646,7 @@ void nrf24_write_command(uint8_t COMMAND) {
 	(void)SPI1->DR; 
 
     // Set CSN high to end communication
-    set_nrf24_SPI_CSN(1);
+  set_nrf24_SPI_CSN(1);
 }
 
 uint8_t nrf24_read_register(uint8_t reg) {
@@ -764,9 +677,8 @@ uint8_t nrf24_read_register(uint8_t reg) {
     return rxData[1]; // Return the value read from the register
 }
 
-uint8_t * nrf24_multiread_register(uint8_t reg, uint8_t num_bytes) {
+uint8_t * nrf24_multiread_register(uint8_t reg, uint8_t num_bytes, uint8_t *rxData) {
     uint8_t txData; // Transmit data 
-    uint8_t rxData[num_bytes+1]; // Receive data buffer
 
     // Set CSN low to start communication
     set_nrf24_SPI_CSN(0);
@@ -853,10 +765,10 @@ void nrf24_clear_TX(){
 }
 
 void test_nrf24_connection() {
-    int success = 0;
+    // int success = 0;
     set_nrf24_SPI_CSN(1); //make sure these pins are at the right level
     set_nrf24_SPI_CE(0);
-    Delay(100); //Let the chip power up and down
+    delay_microseconds(100000, NULL); //Let the chip power up and down
     /*
     uint8_t configValue = nrf24_read_register(STATUS_REG); 
     nrf24_write_register(STATUS_REG, CONFIG_SETTINGS); 
@@ -918,7 +830,6 @@ void transmit(void * data, uint8_t data_len, uint8_t data_size){
     return;
   }
   int i = 0;
-  int len_transmit = 32; 
   int len_left = 0;
   uint8_t data_seg[32];
   //uint8_t data_send[32];
@@ -931,8 +842,13 @@ void transmit(void * data, uint8_t data_len, uint8_t data_size){
 
     transmitBytesNRF(data_seg, len_left);
 
-    //while(!(SPI1->SR & ((uint16_t)(1 << 5)))); // Wait for TX_DS bit to be set from ACK received// TODO don't think this is working, maybe not enough current?
-    data_len = data_len*data_size > 32 ? data_len-=32/data_size : 0; 
+    //while(!(SPI1->SR & ((uint16_t)(1 << 5)))); // Wait for TX_DS bit to be set from ACK received// TODO don't know if this is working
+    if (data_len * data_size > 32) {
+      data_len -= 32 / data_size;
+    } else {
+      data_len = 0; 
+    }
+
     i+=32/data_size;
   }
   
@@ -949,34 +865,8 @@ void transmit(void * data, uint8_t data_len, uint8_t data_size){
 
       ptr += chunk;
       bytes_left -= chunk;
-  }//
-
-  //nrf24_write_register(CONFIG, 0x08);   //power down by setting PWR_UP bit to 0 BAD CODE DON'T USE HERE
+  }
 }
-/*
-void transmit(void * data, uint8_t data_len, uint8_t data_size){ 
-  //data_size must divide data_len and 32 without a remainder and be at least 1
-  if (data_len % data_size != 0 || 32 % data_size != 0 || data_size < 1){
-    return;
-  }
-  int i = 0;
-  int len_transmit = 32; 
-  int len_left = 0;
-  uint8_t data_seg[32];
-
-  nrf24_write_register(CONFIG, 0x0A);         // Set to PTX mode and turn on power bit 0x0A
-  delay_microseconds(2*1000, NULL);  // Wait for chip to go into Standby-I mode
-  while(data_len > 0){
-    len_left = data_len > 32 ? 32 : (data_len*data_size)%32; 
-    memcpy(&data_seg[0], &data[i], len_left); // Mini array of length 32 for buffering transmitted data
-
-    transmitBytesNRF(data_seg, len_transmit);
-
-    data_len = data_len*data_size > 32 ? data_len-=32/data_size : 0; 
-    i+=32/data_size;
-  }
-  nrf24_write_register(CONFIG, 0x08);   // Power down by setting PWR_UP bit to 0
-}*/
 
 /**
  * @brief  Controls the CSN pin for the NRF24LO1+ module. Active low
@@ -1041,7 +931,7 @@ void MySPI_Init(){
   SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_32;
   SPI_InitStruct.SPI_FirstBit = SPI_FirstBit_MSB;
 
-  SPI1->CR2 |= SPI_CR2_FRXTH; //RXNE event is generated if the FIFO level is greater than or equal to 8
+  SPI1->CR2 |= SPI_CR2_FRXTH; // RXNE event is generated if the FIFO level is greater than or equal to 8
 
   //Initialize the SPI peripheral
   SPI_Init(SPI1, &SPI_InitStruct);
@@ -1051,7 +941,7 @@ void MySPI_Init(){
 /** 
  * @brief Initialize the NRF24L01+ module
  * @retval None
-*/  //Not tested
+*/
 void NRF24L01p_Init(){
   //Set up the SPI peripheral
   MySPI_Init();
@@ -1125,32 +1015,32 @@ void UART_Settings_Init(){
    */
   void ICM20948_init(){
     
-    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
+    I2C_transmit(ICM_20948_I2C_ADDRESS, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
 
-    I2C_transmit(0x69, LP_CONFIG, 0x30); // set low power mode for ICM20948 (ACCEL/ GYRO in duty cycle mode)
+    I2C_transmit(ICM_20948_I2C_ADDRESS, LP_CONFIG, 0x30); // set low power mode for ICM20948 (ACCEL/ GYRO in duty cycle mode)
 
-    I2C_transmit(0x69, PWR_MGMT_1, 0x11); // set low power enable for digital circuitry (does not turn on LP mode, use LP_CONFIG) and auto clock select for ICM20948
-    I2C_transmit(0x69, PWR_MGMT_2, 0x00); // enable accelerometer and gyroscope for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, PWR_MGMT_1, 0x11); // set low power enable for digital circuitry (does not turn on LP mode, use LP_CONFIG) and auto clock select for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, PWR_MGMT_2, 0x00); // enable accelerometer and gyroscope for ICM20948
 
-    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_2); // switch to USER BANK 2
+    I2C_transmit(ICM_20948_I2C_ADDRESS, REG_BANK_SEL, USER_BANK_2); // switch to USER BANK 2
   
-    I2C_transmit(0x69, TEMP_CONFIG, 0x01); // set TEMP_DLPCFG for temperature sensor to 1
+    I2C_transmit(ICM_20948_I2C_ADDRESS, TEMP_CONFIG, 0x01); // set TEMP_DLPCFG for temperature sensor to 1
 
-    I2C_transmit(0x69, GYRO_SMPLRT_DIV, 0x07); // set gyro sample rate divider to 7 for ICM20948
-    I2C_transmit(0x69, GYRO_CONFIG_1, 0x3F); // Set gyro +- range to 2000dps and DLPF 3dB point to 361 Hz, and enable LPF for ICM20948
-    I2C_transmit(0x69, GYRO_CONFIG_2, 0x02); // Enable 4x averaging for gyro data for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, GYRO_SMPLRT_DIV, 0x07); // set gyro sample rate divider to 7 for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, GYRO_CONFIG_1, 0x3F); // Set gyro +- range to 2000dps and DLPF 3dB point to 361 Hz, and enable LPF for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, GYRO_CONFIG_2, 0x02); // Enable 4x averaging for gyro data for ICM20948
 
-    I2C_transmit(0x69, ACCEL_SMPLRT_DIV, 0x0A); // set accel sample rate divider to 10 for ICM20948
-    I2C_transmit(0x69, ACCEL_CONFIG, 0x3F); // Set accel +- range to 16g and DLPF 3dB point to 473 Hz, and enable LPF for ICM20948
-    I2C_transmit(0x69, ACCEL_CONFIG_2, 0x00); // Enable 4x averaging for accel data for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, ACCEL_SMPLRT_DIV, 0x0A); // set accel sample rate divider to 10 for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, ACCEL_CONFIG, 0x3F); // Set accel +- range to 16g and DLPF 3dB point to 473 Hz, and enable LPF for ICM20948
+    I2C_transmit(ICM_20948_I2C_ADDRESS, ACCEL_CONFIG_2, 0x00); // Enable 4x averaging for accel data for ICM20948
 
-    I2C_transmit(0x69, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
+    I2C_transmit(ICM_20948_I2C_ADDRESS, REG_BANK_SEL, USER_BANK_0); // switch to USER BANK 0
 
     // Enable bypass mode for I2C access of internal magnetometer
-    I2C_transmit(0x69, 0x0F, 0x02);  // INT_PIN_CFG: BYPASS_EN = 1
+    I2C_transmit(ICM_20948_I2C_ADDRESS, 0x0F, 0x02);  // INT_PIN_CFG: BYPASS_EN = 1
 
     I2C_transmit(0x0C, 0x31, 0x08);  // CNTL2 register = 0x16 (continuous 100 Hz updates to magnetometer data)
-    Delay(10); // TODO find out how long the magnetometer needs to start up
+    delay_microseconds(10*1000, NULL); // TODO find out how long the magnetometer needs to start up
   }
 
   /**
@@ -1169,9 +1059,6 @@ void UART_Settings_Init(){
     float accel_out[3]; //{X,Y,Z}
     float gyro_out[3]; //{X,Y,Z}
 
-    // Thermometer variables
-    float temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
-
     // Magnetometer variables
     int16_t mag_raw[3];
     float mag_out[3];
@@ -1179,10 +1066,13 @@ void UART_Settings_Init(){
     uint8_t new_magdata = 0;
     uint8_t mag_overf = 0;
     uint8_t st1 = 0;
-    uint8_t st2 = 0;
+    uint8_t st2 = 0; 
 
       // Read accelerometer and gyroscope data test
-    I2C_receive(0x69, GYRO_ACCEL_START_REG, accel_gyro_data, 14); // read ACCEL_XOUT_H register and the following 11 registers for accel and gyro data
+    I2C_receive(ICM_20948_I2C_ADDRESS, GYRO_ACCEL_START_REG, accel_gyro_data, 14); // read ACCEL_XOUT_H register and the following 11 registers for accel and gyro data
+
+    // Thermometer variables
+    float temp_out = (((accel_gyro_data[12] << 8) + accel_gyro_data[13] - 0) / TEMP_SENSITIVITY) + 21; // Degrees Celcius
 
     accel_out[0] = ((accel_gyro_data[0] << 8) + accel_gyro_data[1]) / ACCEL_SENSITIVITY * 9.81; // TODO adjust gyro and accelerometer data for temperature drift values
     accel_out[1] = ((accel_gyro_data[2] << 8) + accel_gyro_data[3]) / ACCEL_SENSITIVITY * 9.81; // m/s^2 // TODO reading very high m(309.6 m/s^2), bug?
@@ -1211,21 +1101,19 @@ void UART_Settings_Init(){
     // ST1 check (data ready)
     if(!(st1 & 0x01)) {
         // TOD0 No new data; skip using this sample
-        new_magdata = 0;
-        //return;  
+        new_magdata = 0; 
     }
 
     // ST2 check (overflow)
     if(st2 & 0x08) {
         // TODO Magnetic overflow — discard values
         mag_overf = 1;
-        //return;
     }
 
-    mag_out[0] = mag_raw[0] * 0.15f; // uT
-    mag_out[1] = mag_raw[1] * 0.15f; // uT
-    mag_out[2] = mag_raw[2] * 0.15f; // uT
-    
+    mag_out[0] = mag_raw[0] * MAG_SENSITIVITY; // uT
+    mag_out[1] = mag_raw[1] * MAG_SENSITIVITY; // uT
+    mag_out[2] = mag_raw[2] * MAG_SENSITIVITY; // uT
+
     ICM_data[0] = accel_out[0];
     ICM_data[1] = accel_out[1];
     ICM_data[2] = accel_out[2];

@@ -1,4 +1,3 @@
-/* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include "stm32f0xx_conf.h"
 #include "stm32f0xx_i2c.h"
@@ -6,33 +5,20 @@
 #include "bme280.h"
 #include "bme280_defs.h"
 #include "stm32f0xx_spi.h"
+#include "Peripheral_Init.h"
 
 const uint8_t DEGREE_45 = 1;
 
-/* Exported functions ------------------------------------------------------- */
 void TimingDelay_Decrement(void);
 void Delay(__IO uint32_t nTime);
 
-/* Private typedef -----------------------------------------------------------*/
-struct ambient_reading{
-  uint32_t temperature;
-  uint32_t pressure;
-  uint32_t humidity;
-  uint8_t len;
-};
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
 static __IO uint32_t TimingDelay;
 uint8_t __IO BlinkSpeed = 0;
-/* Private function prototypes -----------------------------------------------*/
-extern struct ambient_reading return_sensor_reading(void);  // Declare the function prototype
 
 RCC_ClocksTypeDef RCC_Clocks;
-/* Private functions ---------------------------------------------------------*/
 
 /**
-  * @brief   Main program
+  * @brief  Main program
   * @param  None
   * @retval None
   */
@@ -51,8 +37,6 @@ int main(void)
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05};
 
-  int readings_arr[3];
-
   System_Clock_Init();
 
   // Servo_Peripherals_Init();
@@ -63,7 +47,8 @@ int main(void)
   // DriveACMotorVoltageController(4500); 
 
   // ADCPeripherals_Init();
-  // uint16_t * adc_values = ADC_take_Readings();
+  // uint16_t adc_values[3];
+  // ADC_take_Readings();
 
   I2C_Settings_Init();
 
@@ -73,12 +58,6 @@ int main(void)
   getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
   getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
 
-  //UART_Settings_Init();
-
-  //send_stringln("Start");
-
-  //BME_Init();
-
   
   NRF24L01p_Init(); // TEST
 
@@ -87,26 +66,11 @@ int main(void)
   delay_microseconds(100*1000, NULL);  // Wait for NRF24L01+ to power on TEST
 
   //transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
-  
-  //STM_EVAL_LEDInit(LED2);
-  //STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_EXTI); 
-
-  BlinkSpeed = 0;
 
   while (1)
   {
     // Display new sensor readings and LED2 Toggle each 1000ms
 
-    STM_EVAL_LEDToggle(LED2);
-
-    
-    //display_sensor_reading();
-    //struct ambient_reading curr_read = return_sensor_reading();
-    //readings_arr[0] = (int)curr_read.temperature;
-    //eadings_arr[1] = (int)curr_read.pressure; // value is unsigned int
-    //readings_arr[2] = (int)curr_read.humidity; // value is unsigned int
-    
-    //transmit(readings_arr, sizeof(readings_arr)/(sizeof(unsigned char)), 1); 
     transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
     Delay(1000);
   }
@@ -123,7 +87,7 @@ void System_Clock_Init(){
 
 /**
 * @brief  Inserts a delay time.
-* @param  nTime: specifies the delay time length, in 1 ms.
+* @param  nTime: specifies the delay time length, in ms.
 * @retval None
 */
 void Delay(__IO uint32_t nTime)
@@ -245,7 +209,7 @@ void send_stringln(char *string)
 */
 void assert_failed(uint8_t* file, uint32_t line)
 { 
-  /* User can add his own implementation to report the file name and line number,
+  /* User can add their own implementation to report the file name and line number,
   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   
   /* Infinite loop */
