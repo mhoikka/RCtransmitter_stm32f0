@@ -72,23 +72,24 @@ int main(void)
   ICM20948_init();
   getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
   getICM20948_ACCEL_GYRO_TEMPdata(ambient_data);
+
   //UART_Settings_Init();
 
   //send_stringln("Start");
 
-  //BME_Init(); 
+  //BME_Init();
 
-  /**
+  
   NRF24L01p_Init(); // TEST
 
   Delay(1);
   test_nrf24_connection(); // TEST
-  delay_microseconds(100*1000, NULL);  //wait for NRF24L01+ to power on TEST
+  delay_microseconds(100*1000, NULL);  // Wait for NRF24L01+ to power on TEST
 
-  transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
-  **/
+  //transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
+  
   //STM_EVAL_LEDInit(LED2);
-  //STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_EXTI);  
+  //STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_EXTI); 
 
   BlinkSpeed = 0;
 
@@ -106,7 +107,7 @@ int main(void)
     //readings_arr[2] = (int)curr_read.humidity; // value is unsigned int
     
     //transmit(readings_arr, sizeof(readings_arr)/(sizeof(unsigned char)), 1); 
-
+    transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
     Delay(1000);
   }
 }

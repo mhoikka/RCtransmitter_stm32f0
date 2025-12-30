@@ -17,6 +17,7 @@ struct bme280_data bme280_datastruct;
 
 uint8_t NUM_REGISTERS_BME280 = 4;
 
+// NRF24L01+ REGISTERS
 uint8_t CONFIG = 0x00;
 uint8_t CONFIG_SETTINGS = 0x00;
 uint8_t ENAA = 0x01;
@@ -37,6 +38,29 @@ uint8_t FLUSH_TX = 0xE1;
 uint8_t NO_ACK = 0;
 uint8_t ACK = 1;
 
+// ICM20948 REGISTERS
+static uint8_t ICM_20948_I2C_ADDRESS = 0x69;
+static uint8_t REG_BANK_SEL = 0x7F;
+static uint8_t USER_BANK_0 = (0 << 4);
+static uint8_t USER_BANK_1 = (1 << 4);
+static uint8_t USER_BANK_2 = (2 << 4);
+static uint8_t USER_BANK_3 = (3 << 4);
+
+// REGISTER BANK 2
+static uint8_t LP_CONFIG = 0x05;
+static uint8_t PWR_MGMT_1 = 0x06;
+static uint8_t PWR_MGMT_2 = 0x07;
+// REGISTER BANK 2
+static uint8_t TEMP_CONFIG = 0x53; 
+static uint8_t GYRO_SMPLRT_DIV = 0x00;
+static uint8_t GYRO_CONFIG_1 = 0x01;
+static uint8_t GYRO_CONFIG_2 = 0x02;
+static uint8_t ACCEL_SMPLRT_DIV = 0x10;
+static uint8_t ACCEL_CONFIG = 0x14;
+static uint8_t ACCEL_CONFIG_2 = 0x15;
+static uint8_t GYRO_ACCEL_START_REG = 0x2D; // ACCEL_XOUT_H register
+
+static uint8_t MAG_START_REG = 0x11;
 /**
  * @brief  Delay function for BME280 drivers.
  * @param  usec: specifies the delay time length, in 1 microsecond.
@@ -829,7 +853,7 @@ void nrf24_clear_TX(){
 }
 
 void test_nrf24_connection() {
-
+    int success = 0;
     set_nrf24_SPI_CSN(1); //make sure these pins are at the right level
     set_nrf24_SPI_CE(0);
     Delay(100); //Let the chip power up and down
@@ -844,11 +868,8 @@ void test_nrf24_connection() {
 
     // Check if expected bits are set
     if ((configValue & CONFIG_SETTINGS) == CONFIG_SETTINGS) {
-        send_stringln("Successful: READ bits match WRITE bits");
-    } else {
-        send_stringln("Failure: READ bits do not match WRITE bits");
-    }
-    */
+        success = 1;
+    }*/ 
 }
 
 uint8_t ADDRESS_LEN = 3;
@@ -870,16 +891,17 @@ void transmitBytesNRF(uint8_t * data, uint8_t data_len) {
     nrf24_write_register(SETUP_AW, 0x01); // Set to 3 byte address width
     nrf24_multiwrite_register(TX_ADDR, write_address, ADDRESS_LEN); // Set write address
     nrf24_multiwrite_register(RX_ADDR_P0, write_address, ADDRESS_LEN); // Set read address
-    nrf24_write_register(RF_SETUP, 0x00); // Set RF Data Rate to 1Mbps, RF output power to -18dBm
-    nrf24_write_register(RX_PW_P0, 0x01); // Set payload size to 1 byte
+    //nrf24_write_register(RF_SETUP, 0x00); // Set RF Data Rate to 1Mbps, RF output power to -18dBm
+    //CHANGE POWER TO MAX 0dBm TEST
+    nrf24_write_register(RF_SETUP, 0x07);
+    nrf24_write_register(RX_PW_P0, 0x20); // Set payload size to 32 bytes
     
     nrf24_write_register(FEATURE, 0x01); // Enable W_TX_PAYLOAD_NOACK command
 
     nrf24_write_TX_payload(data, ACK, data_len);            // Write data to be transmitted into TX FIFO
     set_nrf24_SPI_CE(1);                  // Enable chip to transmit data
     delay_microseconds(130, NULL); // Wait for chip to go into TX mode
-    Delay(1);
-    Delay(50);   // Not sure how long this delay needs to be TODO test this
+    delay_microseconds(15, NULL);    // Not sure how long this delay needs to be TODO test this
 
     set_nrf24_SPI_CE(0); // Disable chip after transmission
 }
@@ -891,7 +913,7 @@ void transmitBytesNRF(uint8_t * data, uint8_t data_len) {
 * @param: data_size: size of the data type to be transmitted in bytes
 */
 void transmit(void * data, uint8_t data_len, uint8_t data_size){ 
-  //data_size must divide data_len and 32 without a remainder and be at least 1
+  // Data_size must divide data_len and 32 without a remainder and be at least 1
   if (data_len % data_size != 0 || 32 % data_size != 0 || data_size < 1){
     return;
   }
@@ -900,20 +922,61 @@ void transmit(void * data, uint8_t data_len, uint8_t data_size){
   int len_left = 0;
   uint8_t data_seg[32];
   //uint8_t data_send[32];
-  nrf24_write_register(CONFIG, 0x0A);         //set to PTX mode and turn on power bit 0x0A
-  delay_microseconds(2*1000, NULL);  //wait for chip to go into Standby-I mode
+  nrf24_write_register(CONFIG, 0x0A);         // Set to PTX mode and turn on power bit 0x0A
+  delay_microseconds(2*1000, NULL);  // Wait for chip to go into Standby-I mode
+  
   while(data_len > 0){
     len_left = ((data_len*data_size) >= 32) ? 32 : (data_len*data_size)%32; 
-    memcpy(&data_seg[0], (const unsigned char *)data + i, len_left); //mini array of length 32 for buffering transmitted data
+    memcpy(&data_seg[0], (const unsigned char *)data + i, len_left); // Mini array of length 32 for buffering transmitted data
 
-    transmitBytesNRF(data_seg, len_transmit);
+    transmitBytesNRF(data_seg, len_left);
 
-    //while(!(SPI1->SR & ((uint16_t)(1 << 5)))); //wait for TX_DS bit to be set from ACK received// TODO don't think this is working, maybe not enough current?
+    //while(!(SPI1->SR & ((uint16_t)(1 << 5)))); // Wait for TX_DS bit to be set from ACK received// TODO don't think this is working, maybe not enough current?
     data_len = data_len*data_size > 32 ? data_len-=32/data_size : 0; 
     i+=32/data_size;
   }
-  nrf24_write_register(CONFIG, 0x08);   //power down by setting PWR_UP bit to 0
+  
+
+  //
+  uint16_t bytes_left = data_len * data_size;
+  uint8_t* ptr = data;
+
+  while (bytes_left > 0) {
+      uint8_t chunk = bytes_left >= 32 ? 32 : bytes_left;
+      memcpy(data_seg, ptr, chunk);
+
+      transmitBytesNRF(data_seg, chunk);
+
+      ptr += chunk;
+      bytes_left -= chunk;
+  }//
+
+  //nrf24_write_register(CONFIG, 0x08);   //power down by setting PWR_UP bit to 0 BAD CODE DON'T USE HERE
 }
+/*
+void transmit(void * data, uint8_t data_len, uint8_t data_size){ 
+  //data_size must divide data_len and 32 without a remainder and be at least 1
+  if (data_len % data_size != 0 || 32 % data_size != 0 || data_size < 1){
+    return;
+  }
+  int i = 0;
+  int len_transmit = 32; 
+  int len_left = 0;
+  uint8_t data_seg[32];
+
+  nrf24_write_register(CONFIG, 0x0A);         // Set to PTX mode and turn on power bit 0x0A
+  delay_microseconds(2*1000, NULL);  // Wait for chip to go into Standby-I mode
+  while(data_len > 0){
+    len_left = data_len > 32 ? 32 : (data_len*data_size)%32; 
+    memcpy(&data_seg[0], &data[i], len_left); // Mini array of length 32 for buffering transmitted data
+
+    transmitBytesNRF(data_seg, len_transmit);
+
+    data_len = data_len*data_size > 32 ? data_len-=32/data_size : 0; 
+    i+=32/data_size;
+  }
+  nrf24_write_register(CONFIG, 0x08);   // Power down by setting PWR_UP bit to 0
+}*/
 
 /**
  * @brief  Controls the CSN pin for the NRF24LO1+ module. Active low
@@ -922,11 +985,11 @@ void transmit(void * data, uint8_t data_len, uint8_t data_size){
 void set_nrf24_SPI_CSN(uint8_t input){
   while (SPI1->SR & SPI_SR_BSY); // Wait until SPI is not busy
   if(input == 1){
-    (GPIOA->BSRR = GPIO_BSRR_BS_10);
+    (GPIOA->BSRR = GPIO_BSRR_BS_4);
   }
   else{
     delay_microseconds(5, NULL); // Makes sure CSN doesn't go low too quickly after last SPI operation
-    (GPIOA->BSRR = GPIO_BSRR_BR_10);
+    (GPIOA->BSRR = GPIO_BSRR_BR_4);
   }
 }
 
@@ -936,11 +999,11 @@ void set_nrf24_SPI_CSN(uint8_t input){
  */
 void set_nrf24_SPI_CE(uint8_t input){
   if(input == 1){
-    (GPIOA->BSRR = GPIO_BSRR_BS_8);
+    (GPIOA->BSRR = GPIO_BSRR_BS_9);
   }
   else{
-    delay_microseconds(5, NULL); // Makes sure CE doesn't go low too quickly after last SPI operation TODO check if necessary
-    (GPIOA->BSRR = GPIO_BSRR_BR_8);
+    delay_microseconds(5, NULL); // Makes sure CE doesn't go low too quickly after last SPI operation TODO check if this is necessary
+    (GPIOA->BSRR = GPIO_BSRR_BR_9);
   }
 }
 
@@ -996,7 +1059,7 @@ void NRF24L01p_Init(){
   //Set up the GPIO pins
   GPIO_InitTypeDef GPIO_InitStruct_1;
   //Set up the CSN pin
-  GPIO_InitStruct_1.GPIO_Pin = GPIO_Pin_10;
+  GPIO_InitStruct_1.GPIO_Pin = GPIO_Pin_4;
   GPIO_InitStruct_1.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStruct_1.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct_1.GPIO_OType = GPIO_OType_PP;
@@ -1005,7 +1068,7 @@ void NRF24L01p_Init(){
 
   GPIO_InitTypeDef GPIO_InitStruct_2;
   //Set up the IRQ pin
-  GPIO_InitStruct_2.GPIO_Pin = GPIO_Pin_9;
+  GPIO_InitStruct_2.GPIO_Pin = GPIO_Pin_10;
   GPIO_InitStruct_2.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct_2.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStruct_2.GPIO_Mode = GPIO_Mode_IN;
@@ -1014,7 +1077,7 @@ void NRF24L01p_Init(){
 
    GPIO_InitTypeDef GPIO_InitStruct_3;
   //Set up the CE pin
-  GPIO_InitStruct_3.GPIO_Pin = GPIO_Pin_8;
+  GPIO_InitStruct_3.GPIO_Pin = GPIO_Pin_9;
   GPIO_InitStruct_3.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStruct_3.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct_3.GPIO_OType = GPIO_OType_PP;
@@ -1054,30 +1117,6 @@ void UART_Settings_Init(){
   //No synchronous mode yet
   USART_Cmd(USART2, ENABLE);
 }
-
-
-static uint8_t ICM_20948_I2C_ADDRESS = 0x69;
-static uint8_t REG_BANK_SEL = 0x7F;
-static uint8_t USER_BANK_0 = (0 << 4);
-static uint8_t USER_BANK_1 = (1 << 4);
-static uint8_t USER_BANK_2 = (2 << 4);
-static uint8_t USER_BANK_3 = (3 << 4);
-
-// REGISTER BANK 2
-static uint8_t LP_CONFIG = 0x05;
-static uint8_t PWR_MGMT_1 = 0x06;
-static uint8_t PWR_MGMT_2 = 0x07;
-// REGISTER BANK 2
-static uint8_t TEMP_CONFIG = 0x53; 
-static uint8_t GYRO_SMPLRT_DIV = 0x00;
-static uint8_t GYRO_CONFIG_1 = 0x01;
-static uint8_t GYRO_CONFIG_2 = 0x02;
-static uint8_t ACCEL_SMPLRT_DIV = 0x10;
-static uint8_t ACCEL_CONFIG = 0x14;
-static uint8_t ACCEL_CONFIG_2 = 0x15;
-static uint8_t GYRO_ACCEL_START_REG = 0x2D; // ACCEL_XOUT_H register
-
-static uint8_t MAG_START_REG = 0x11;
 
   /**
    * @brief Sets up ICM20948 for data collection and puts magnetometer(AK09916) into continuous mode 4 (100 Hz data rate)
