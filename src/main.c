@@ -42,13 +42,16 @@ int main(void)
   // Servo_Peripherals_Init();
   // DriveServoControl(DEGREE_45);
 
-
   // HBridge_Peripherals_Init();
   // DriveACMotorVoltageController(4500); 
 
-  // ADCPeripherals_Init();
+  //ADCPeripherals_Init();
   // uint16_t adc_values[3];
   // ADC_take_Readings();
+  //uint16_t adc_battery_reading = 0;
+  //adc_battery_reading = ADC_take_BatteryReading(adc_battery_reading);
+  //volatile float battery_voltage = 0.0f;
+  //battery_voltage = batteryVoltageMeasurement(adc_battery_reading);
 
   I2C_Settings_Init();
 
@@ -65,14 +68,12 @@ int main(void)
   test_nrf24_connection(); // TEST
   delay_microseconds(100*1000, NULL);  // Wait for NRF24L01+ to power on TEST
 
-  //transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
+  //transmit(adc_battery_reading, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
 
   while (1)
   {
-    // Display new sensor readings and LED2 Toggle each 1000ms
-
-    transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
-    Delay(1000);
+    transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST Maximum 350 Hz with 1Mbps transmissions. Should be more than good enough.
+    //Delay(1000);
   }
 }
 
@@ -82,7 +83,7 @@ int main(void)
  */
 void System_Clock_Init(){
   RCC_GetClocksFreq(&RCC_Clocks);
-  SysTick_Config(RCC_Clocks.HCLK_Frequency / 1000);
+  SysTick_Config(RCC_Clocks.HCLK_Frequency / 1000); // TODO is this millisecond timer accurate? It seems like it would run 8x too fast
 }
 
 /**

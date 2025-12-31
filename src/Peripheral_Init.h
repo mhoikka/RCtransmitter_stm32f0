@@ -32,6 +32,7 @@ void DriveServoControl(uint8_t angle);
 void enableADC_batteryvoltagesense();
 void ADCPeripherals_Init();
 uint16_t * ADC_take_Readings();
+uint16_t ADC_take_BatteryReading(uint16_t adc_reading);
 float batteryVoltageMeasurement(uint16_t ADC_12bit);
 void DriveACMotorVoltageController(uint32_t Period);
 void NRF24L01p_Init();

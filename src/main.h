@@ -50,6 +50,7 @@ char* reverse(char *buffer, int i, int j);
 char* itoa(int value, char* buffer, int base);
 void send_string(char *string);
 void send_stringln(char *string);
+uint32_t micros();
 #endif /* __MAIN_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

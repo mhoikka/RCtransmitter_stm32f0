@@ -264,16 +264,16 @@ void DriveServoControl(uint8_t angle){ // For testing purposes only, moves all s
  * @retval None
  */
 void enableADC_batteryvoltagesense(){
-  GPIO_InitTypeDef GPIO_InitStruct;
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE); // enable clocks for GPIO peripheral 
+  GPIO_InitTypeDef GPIO_InitStruct; 
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE); // enable clocks for GPIO peripheral 
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // enable clocks for ADC peripheral
-  // Configure PC0 as analog input for battery voltage measurement
-  GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0; // TODO change this pin
+  // Configure PA0 as analog input for battery voltage measurement
+  GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0; 
   GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AN;
   GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; // TODO check these settings
   GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_Init(GPIOC, &GPIO_InitStruct);
+  GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
 /**
@@ -281,7 +281,7 @@ void enableADC_batteryvoltagesense(){
  * @retval None
  */
 void ADCPeripherals_Init(){
-  // Set up ADC10, ADC11, and ADC12 for joystick voltage measurement
+  // Set up ADC for voltage measurement
   ADC_InitTypeDef ADC_InitStruct;
   ADC_InitStruct.ADC_Resolution = ADC_Resolution_12b;
   ADC_InitStruct.ADC_ContinuousConvMode = DISABLE;
@@ -310,7 +310,6 @@ uint16_t * ADC_take_Readings(uint16_t * adc_readings){
 
   GPIO_InitTypeDef GPIO_InitStruct;
   RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE); // enable clocks for GPIO peripheral 
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // enable clocks for ADC peripheral
   // Configure PC0 as analog input for joystick voltage measurement
   GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_2; 
   GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AN;
@@ -357,6 +356,46 @@ uint16_t * ADC_take_Readings(uint16_t * adc_readings){
   while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
   adc_readings[2] = ADC_GetConversionValue(ADC1);
   return adc_readings;
+}
+
+/**
+ * @brief Takes a single ADC reading from ADC0 (PA0)
+ * @retval 1 12-bit ADC reading in unsigned integer format, in a 16 bit integer package padded with 0s on the MSB side
+ */
+uint16_t ADC_take_BatteryReading(uint16_t adc_reading){
+  // Read single ADC channel ADC0 (PA0)
+
+  // make sure ADC peripheral clock was enabled earlier:
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // safe to call if already enabled
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);  // enable GPIOA for PA0
+
+  // Configure PA0 as analog input
+  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0;
+  GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; // kept from existing style
+  GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  // Enable ADC and wait until ADEN is set
+  ADC_Cmd(ADC1, ENABLE);
+  while (ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN) == RESET) {
+    /* wait for ADC ready */
+  }
+
+  // Configure channel 0 (PA0)
+  ADC_ChannelConfig(ADC1, ADC_Channel_0, ADC_SampleTime_239_5Cycles);
+
+  // Start conversion and wait for completion
+  ADC_StartOfConversion(ADC1);
+  while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
+  adc_reading = ADC_GetConversionValue(ADC1);
+
+  // Clear EOC flag (safe to do)
+  ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
+
+  return adc_reading;
 }
 
 /**
@@ -816,6 +855,7 @@ void transmitBytesNRF(uint8_t * data, uint8_t data_len) {
     delay_microseconds(15, NULL);    // Not sure how long this delay needs to be TODO test this
 
     set_nrf24_SPI_CE(0); // Disable chip after transmission
+    delay_microseconds(8*32, NULL); // TODO Adjust wait time for different packet sizes
 }
 
 /** 
