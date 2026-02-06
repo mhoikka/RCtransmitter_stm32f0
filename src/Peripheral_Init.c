@@ -39,7 +39,7 @@ uint8_t NO_ACK = 0;
 uint8_t ACK = 1;
 
 // ICM20948 REGISTERS
-static uint8_t ICM_20948_I2C_ADDRESS = 0x69;
+static uint8_t ICM_20948_I2C_ADDRESS = 0x68;
 static uint8_t REG_BANK_SEL = 0x7F;
 static uint8_t USER_BANK_0 = (0 << 4);
 static uint8_t USER_BANK_1 = (1 << 4);
@@ -362,7 +362,7 @@ uint16_t * ADC_take_Readings(uint16_t * adc_readings){
  * @brief Takes a single ADC reading from ADC0 (PA0)
  * @retval 1 12-bit ADC reading in unsigned integer format, in a 16 bit integer package padded with 0s on the MSB side
  */
-uint16_t ADC_take_BatteryReading(uint16_t adc_reading){
+uint16_t ADC_take_BatteryReading(uint16_t adc_reading){ // TODO switch to using ADC_take_Multiple_Readings
   // Read single ADC channel ADC0 (PA0)
 
   // make sure ADC peripheral clock was enabled earlier:
@@ -1083,12 +1083,47 @@ void UART_Settings_Init(){
     delay_microseconds(10*1000, NULL); // TODO find out how long the magnetometer needs to start up
   }
 
-  /**
+/**
+ * @brief Constructs control packet for receiver PCB
+  * @param uint8_t * joystick: Array of 4 joystick values, each 1 byte
+  * @param uint8_t servos: byte for servo control signals (max 8)
+  * @param uint8_t * predictions: Array of 4 predicted values, each 1 byte
+  * @param uint8_t checksum: byte for error checking
+  * @param *uint8_t control_packet: Control packet to be constructed, up to 32 bytes
+  * @retval None
+ */
+void makeControlSignal(uint8_t * joystick, uint8_t servos, uint8_t * predictions, uint8_t checksum, 
+  uint8_t *control_packet){
+  *control_packet = 0;
+  *control_packet |= ((joystick[0] & 0xFF));
+  *control_packet |= ((joystick[1] & 0xFF) << 8);
+  *control_packet |= ((joystick[2] & 0xFF) << 16);
+  *control_packet |= ((joystick[3] & 0xFF) << 24);
+  *control_packet |= ((servos & 0x01) << 32);
+  *control_packet |= ((servos & 0x02) << 33);
+  *control_packet |= ((servos & 0x04) << 34);
+  *control_packet |= ((servos & 0x08) << 35);
+  *control_packet |= ((servos & 0x10) << 36);
+  *control_packet |= ((servos & 0x20) << 37);
+  *control_packet |= ((servos & 0x40) << 38);
+  *control_packet |= ((servos & 0x80) << 39);
+  *control_packet |= ((predictions[0] & 0xFF) << 40);
+  *control_packet |= ((predictions[1] & 0xFF) << 48);
+  *control_packet |= ((predictions[2] & 0xFF) << 56);
+  *control_packet |= ((predictions[3] & 0xFF) << 64);
+  *control_packet |= ((checksum & 0xFF) << 72);
+} // Not using all of packet space at the moment (max 32 bytes)
+// TODO write code for predicted_gyroscope, predicted_accelerometer, predicted_magnetometer, predicted_distance values
+// TODO Untested
+
+
+
+/**
  * @brief Collects ambient data from ICM20948 and puts it into the provided array ICM_data
- * @param None
+ * @param float * ICM_data  Array to store the collected data
  * @retval None
  */
-  void getICM20948_ACCEL_GYRO_TEMPdata(float * ICM_data){
+  void getICM20948_ACCEL_GYRO_TEMPdata(float * ICM_data){ // TODO switch to using ADC_take_Multiple_Readings
     static float ACCEL_SENSITIVITY = 2048;
     static float GYRO_SENSITIVITY = 16.4; 
     static float MAG_SENSITIVITY = 0.15;
@@ -1165,3 +1200,101 @@ void UART_Settings_Init(){
     ICM_data[8] = mag_out[1];
     ICM_data[9] = mag_out[2];
   }
+
+/**
+ * @brief Convert 4x 16 bit ADC readings to 8 bit scaled ADC output for transmission 
+ * @param uint16_t * adc_controller_values: The 16 bit ADC values to convert, from vertical and horizontal axes of both joysticks (4 entries)
+ * @param uint8_t *_8bit_values: The 8 bit ADC values after conversion
+ * @retval None
+ */
+void ADC_convert_to_8bit_controls(uint16_t *adc_controller_values, uint8_t *_8bit_values)
+{
+    // Scale down the 16 bit ADC value to 8 bits
+    for (int i = 0; i < 4; i++) {
+        uint8_t downscaledADC_Reading = (uint8_t)(adc_controller_values[i] >> 8);
+        adc_controller_values[i] = downscaledADC_Reading; // TODO add the real conversion process in here
+    }
+    return;
+} // TODO test this 
+
+/**
+ * @brief Generate predictions for aircraft sensor readings and distance
+ * @param uint16_t *sensor_data: Pointer to the array containing last sensor readings
+ * @param uint16_t *predictions: Pointer to the array to store predicted values for accelerometer, distance, magnetometer, and gyroscope
+ * @retval None
+ */
+void generate_predictions(uint16_t *sensor_data, uint16_t *predictions, uint8_t length)
+{
+    // TODO alter global variable containing last extrapolated position data
+    return; // TODO implement prediction algorithm
+}
+
+/**
+ * @brief Takes a single ADC reading from all indicated channels
+ * @param uint16_t ADC_channel: The ADC channels to read from, with each channel's status indicated by a 1 or 0 in the respective bit position
+ * @param uint16_t *adc: pointer to array to store ADC readings, 15 uint16_t long
+ * @retval None
+ */
+uint16_t ADC_take_Multiple_Readings(uint16_t ADC_channels, uint16_t *adc){ // TODO untested
+
+  // make sure ADC peripheral clock was enabled earlier:
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // safe to call if already enabled, only one ADC 
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);  // enable all GPIO peripherals, TODO be more efficient here
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);  
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);  
+
+  // Configure selected pins as analog inputs
+  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitStruct.GPIO_Pin = ADC_channels & 0x00FF; // Status of all channels is indicated by bits in the respective position in the uint16_t variable
+  GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; // kept from existing style
+  GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  // Configure selected pins as analog inputs
+  GPIO_InitTypeDef GPIO_InitStruct2;
+  GPIO_InitStruct2.GPIO_Pin = ADC_channels & 0x0300; // Status of all channels is indicated by bits in the respective position in the uint16_t variable
+  GPIO_InitStruct2.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStruct2.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStruct2.GPIO_OType = GPIO_OType_PP; // kept from existing style
+  GPIO_InitStruct2.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  // Configure selected pins as analog inputs
+  GPIO_InitTypeDef GPIO_InitStruct3;
+  GPIO_InitStruct3.GPIO_Pin = ADC_channels & 0xFC00; // Status of all channels is indicated by bits in the respective position in the uint16_t variable
+  GPIO_InitStruct3.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStruct3.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStruct3.GPIO_OType = GPIO_OType_PP; // kept from existing style
+  GPIO_InitStruct3.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_Init(GPIOC, &GPIO_InitStruct3);
+
+  // Enable ADC and wait until ADEN is set
+  ADC_Cmd(ADC1, ENABLE);
+  while (ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN) == RESET) {
+    /* wait for ADC ready */
+  }
+
+  // Configure the chosen channels for a long sample time
+  for(uint8_t pos = 0; pos < 16; pos++){
+    if((ADC_channels >> pos) & 0x1){
+      ADC_ChannelConfig(ADC1, 0x01<<pos, ADC_SampleTime_239_5Cycles);
+    }
+  }
+
+  // Start conversion and wait for completion
+  ADC_StartOfConversion(ADC1);
+
+ for(uint8_t pos = 0; pos < 16; pos++){
+    if(ADC_channels>>pos & 0x1){
+      while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
+      adc[pos] = ADC_GetConversionValue(ADC1); // TODO does this scan all channels or does it need to be manually switched?
+    }
+  }
+
+  // Clear EOC flag (safe to do)
+  ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
+
+  return;
+}

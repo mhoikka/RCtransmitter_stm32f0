@@ -36,6 +36,18 @@ int main(void)
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
                             0x07, 0x08, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05};
+  uint8_t control_packet[32] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  // Each index in this adc array corresponds to the ADC channel that the data is drawn from on the STM32F030R8T6 used in this project
+  uint16_t adc[15] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  uint8_t adc_8bit_values[4] = {0x00, 0x00, 0x00, 0x00};
+  uint16_t adc_controller_values[4] = {0x00, 0x00, 0x00, 0x00};
+  uint16_t *sensor_data[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  uint16_t *predictions[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  uint8_t servos = 0x00; // Each bit corresponds to one servo control signal, // TODO read control signals and construct this value
+  uint8_t checksum = 0x00; // leave this for now // TODO implement checksum calculation for control_packet
 
   System_Clock_Init();
 
@@ -69,14 +81,19 @@ int main(void)
   delay_microseconds(100*1000, NULL);  // Wait for NRF24L01+ to power on TEST
 
   //transmit(adc_battery_reading, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST
-
+ 
   while (1)
   {
-    transmit(data, sizeof(data)/sizeof(unsigned char), sizeof(unsigned char)); // TEST Maximum 350 Hz with 1Mbps transmissions. Should be more than good enough.
-    //Delay(1000);
+    // TODO receive sensor data from RC_Receiver on plane
+    ADC_take_Multiple_Readings(0x000F, adc); // Use analog inputs A0-A3, first three entries in adc array
+    ADC_convert_to_8bit_controls(adc_controller_values, adc_8bit_values); 
+    generate_predictions(sensor_data, predictions, 10); // TODO read sensor data
+    makeControlSignal(adc_8bit_values, servos, checksum, predictions, control_packet);
+    transmit(control_packet, sizeof(control_packet), sizeof(uint8_t)); // TEST Maximum 350 Hz with 1Mbps transmissions. Should be more than good enough.
+    Delay(1000);
   }
 }
-
+ 
 /**
  * @brief  Initializes the STM32F030R8 clock
  * @retval None
