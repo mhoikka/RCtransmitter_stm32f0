@@ -43,6 +43,6 @@ void getICM20948_ACCEL_GYRO_TEMPdata();
 void transmit(void * data, uint8_t data_len, uint8_t data_size);
 void makeControlSignal(uint8_t * joystick, uint8_t servos, uint8_t * predictions, uint8_t checksum, 
   uint8_t *control_packet);
-void ADC_convert_to_8bit_controls(uint16_t *adc_controller_values, uint8_t *_8bit_values);
+void ADC_convert_to_8bit_controls(uint16_t *adc_controller_values, uint8_t *_8bit_values, uint8_t length);
 void generate_predictions(uint16_t *sensor_data, uint16_t *predictions, uint8_t length);
 uint16_t ADC_take_Multiple_Readings(uint16_t ADC_channels, uint16_t *adc);

@@ -1095,23 +1095,23 @@ void UART_Settings_Init(){
 void makeControlSignal(uint8_t * joystick, uint8_t servos, uint8_t * predictions, uint8_t checksum, 
   uint8_t *control_packet){
   *control_packet = 0;
-  *control_packet |= ((joystick[0] & 0xFF));
-  *control_packet |= ((joystick[1] & 0xFF) << 8);
-  *control_packet |= ((joystick[2] & 0xFF) << 16);
-  *control_packet |= ((joystick[3] & 0xFF) << 24);
-  *control_packet |= ((servos & 0x01) << 32);
-  *control_packet |= ((servos & 0x02) << 33);
-  *control_packet |= ((servos & 0x04) << 34);
-  *control_packet |= ((servos & 0x08) << 35);
-  *control_packet |= ((servos & 0x10) << 36);
-  *control_packet |= ((servos & 0x20) << 37);
-  *control_packet |= ((servos & 0x40) << 38);
-  *control_packet |= ((servos & 0x80) << 39);
-  *control_packet |= ((predictions[0] & 0xFF) << 40);
-  *control_packet |= ((predictions[1] & 0xFF) << 48);
-  *control_packet |= ((predictions[2] & 0xFF) << 56);
-  *control_packet |= ((predictions[3] & 0xFF) << 64);
-  *control_packet |= ((checksum & 0xFF) << 72);
+  control_packet[0] |= joystick[0] & 0xFF;
+  control_packet[1] |= joystick[1] & 0xFF;
+  control_packet[2] |= joystick[2] & 0xFF;
+  control_packet[3] |= joystick[3] & 0xFF;
+  control_packet[4] |= ((servos & 0x01) << 0);
+  control_packet[4] |= ((servos & 0x02) << 1);
+  control_packet[4] |= ((servos & 0x04) << 2);
+  control_packet[4] |= ((servos & 0x08) << 3);
+  control_packet[4] |= ((servos & 0x10) << 4);
+  control_packet[4] |= ((servos & 0x20) << 5);
+  control_packet[4] |= ((servos & 0x40) << 6);
+  control_packet[4] |= ((servos & 0x80) << 7);
+  control_packet[5] |= predictions[0];
+  control_packet[6] |= predictions[1];
+  control_packet[7] |= predictions[2];
+  control_packet[8] |= predictions[3];
+  control_packet[9] |= checksum;
 } // Not using all of packet space at the moment (max 32 bytes)
 // TODO write code for predicted_gyroscope, predicted_accelerometer, predicted_magnetometer, predicted_distance values
 // TODO Untested
@@ -1207,15 +1207,15 @@ void makeControlSignal(uint8_t * joystick, uint8_t servos, uint8_t * predictions
  * @param uint8_t *_8bit_values: The 8 bit ADC values after conversion
  * @retval None
  */
-void ADC_convert_to_8bit_controls(uint16_t *adc_controller_values, uint8_t *_8bit_values)
+void ADC_convert_to_8bit_controls(uint16_t *adc_controller_values, uint8_t *_8bit_values, uint8_t length)
 {
     // Scale down the 16 bit ADC value to 8 bits
-    for (int i = 0; i < 4; i++) {
-        uint8_t downscaledADC_Reading = (uint8_t)(adc_controller_values[i] >> 8);
-        adc_controller_values[i] = downscaledADC_Reading; // TODO add the real conversion process in here
+    for (int i = 0; i < length; i++) {
+        uint8_t downscaledADC_Reading = (uint8_t)(adc_controller_values[i] >> 7); // reduce uint16_t 12 bit adc reading to uint8_t holding one of 32 distinct possible values (5 bit representation)
+        _8bit_values[i] = downscaledADC_Reading; // TODO add the real conversion process in here
     }
     return;
-} // TODO test this 
+} 
 
 /**
  * @brief Generate predictions for aircraft sensor readings and distance
@@ -1245,7 +1245,7 @@ uint16_t ADC_take_Multiple_Readings(uint16_t ADC_channels, uint16_t *adc){ // TO
 
   // Configure selected pins as analog inputs
   GPIO_InitTypeDef GPIO_InitStruct;
-  GPIO_InitStruct.GPIO_Pin = ADC_channels & 0x00FF; // Status of all channels is indicated by bits in the respective position in the uint16_t variable
+  GPIO_InitStruct.GPIO_Pin = ADC_channels & 0x00FF; // PA 0-7 possible, status of all channels is indicated by bits in the respective position in the uint16_t variable
   GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AN;
   GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; // kept from existing style
@@ -1254,7 +1254,7 @@ uint16_t ADC_take_Multiple_Readings(uint16_t ADC_channels, uint16_t *adc){ // TO
 
   // Configure selected pins as analog inputs
   GPIO_InitTypeDef GPIO_InitStruct2;
-  GPIO_InitStruct2.GPIO_Pin = ADC_channels & 0x0300; // Status of all channels is indicated by bits in the respective position in the uint16_t variable
+  GPIO_InitStruct2.GPIO_Pin = ADC_channels & 0x0300; // PB 0-1 possible, status of all channels is indicated by bits in the respective position in the uint16_t variable
   GPIO_InitStruct2.GPIO_Mode = GPIO_Mode_AN;
   GPIO_InitStruct2.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct2.GPIO_OType = GPIO_OType_PP; // kept from existing style
@@ -1263,7 +1263,7 @@ uint16_t ADC_take_Multiple_Readings(uint16_t ADC_channels, uint16_t *adc){ // TO
 
   // Configure selected pins as analog inputs
   GPIO_InitTypeDef GPIO_InitStruct3;
-  GPIO_InitStruct3.GPIO_Pin = ADC_channels & 0xFC00; // Status of all channels is indicated by bits in the respective position in the uint16_t variable
+  GPIO_InitStruct3.GPIO_Pin = ADC_channels & 0xFC00; // PC 0-5 possible, status of all channels is indicated by bits in the respective position in the uint16_t variable
   GPIO_InitStruct3.GPIO_Mode = GPIO_Mode_AN;
   GPIO_InitStruct3.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStruct3.GPIO_OType = GPIO_OType_PP; // kept from existing style

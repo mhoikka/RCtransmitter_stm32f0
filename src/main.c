@@ -85,12 +85,12 @@ int main(void)
   while (1)
   {
     // TODO receive sensor data from RC_Receiver on plane
-    ADC_take_Multiple_Readings(0x000F, adc); // Use analog inputs A0-A3, first three entries in adc array
-    ADC_convert_to_8bit_controls(adc_controller_values, adc_8bit_values); 
+    ADC_take_Multiple_Readings(0x000F, adc); // Use analog inputs A0-A3, first three entries in adc array for joystick values
+    ADC_convert_to_8bit_controls(adc, adc_8bit_values, 4); // Array entries in order are analog read values for V and H joystick 1, and V and H joystick 2
     generate_predictions(sensor_data, predictions, 10); // TODO read sensor data
-    makeControlSignal(adc_8bit_values, servos, checksum, predictions, control_packet);
+    makeControlSignal(adc_8bit_values, servos, predictions, checksum, control_packet);
     transmit(control_packet, sizeof(control_packet), sizeof(uint8_t)); // TEST Maximum 350 Hz with 1Mbps transmissions. Should be more than good enough.
-    Delay(1000);
+    delay_microseconds(3000, NULL);  // reduce rate to ~300 Hz for control packets TODO time this
   }
 }
  
